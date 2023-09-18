@@ -13,8 +13,8 @@ local K_MOUNT_PITCH = 7 -- Function Number Pitch Mount
 local deg2pwm = 2.778 -- Convert degrees to PWM
 
 local YAW_STEP = 36*deg2pwm -- Yaw step in PWM
-local PITCH_STEP_UP = 28*deg2pwm -- Pitch step in PWM
-local PITCH_STEP_DN = 23*deg2pwm -- Pitch step in PWM
+local PITCH_STEP_UP = 37*deg2pwm -- Pitch step in PWM
+local PITCH_STEP_DN = 24*deg2pwm -- Pitch step in PWM
 
 local cur_yaw_step = -1
 local cur_pitch_step = false
@@ -23,6 +23,8 @@ local trig_hotshoe_state = false
 gpio:pinMode(54,0) -- set AUX 5 to input
 local camera_feedback = gpio:read(54)
 local takePic = false
+local picCount = 0 -- Current Counter of what picture we are on
+local picTotal = 3 -- Number of pictures per station
 
 local fileNum = -1
 local file_name = "Scan"..tostring(fileNum)..".csv"
@@ -37,8 +39,8 @@ local log_data = {}
 
 local yaw_min = 1000
 local yaw_max = 2000
-local pitch_trim = 1500
-local yaw_cmd = yaw_min
+local pitch_trim = 1625
+local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
 
 function write_to_file()
@@ -61,7 +63,12 @@ function write_to_file()
     file:write(tostring(millis()) .. ", " .. table.concat(log_data,", ") .. "\n")
     -- make sure file is upto date
     file:flush()
-    return step_servo, 1000
+    if picCount >= picTotal then
+        picCount = 0
+        return step_servo, 500
+    else
+        return take_pic, 1
+    end
 end
 
 function take_pic()
@@ -75,12 +82,13 @@ function take_pic()
 
     if takePic == false then -- Trigger Servo Pin for Camera Trigger
         rc:run_aux_function(9, 2) -- Trigger Take Picture Auxillary Function
-        gcs:send_text(0, "Trigger Picture")
+        gcs:send_text(0, "Trigger " ..tostring(picCount+1).." Picture")
         takePic = true
     end
     camera_feedback = gpio:read(54)
     if camera_feedback == trig_hotshoe_state then -- Hotshoe Feedback
-        gcs:send_text(0, "Picture Taken")
+        picCount = picCount + 1
+        gcs:send_text(0, "Picture "..tostring(picCount).." Taken")
         takePic = false
         return write_to_file, 100
     else
@@ -97,7 +105,7 @@ function step_servo() -- Step Servo command through Sequence
         return reset_home, 100
     end
     cur_yaw_step = cur_yaw_step + 1
-    yaw_cmd =  math.floor(yaw_min + cur_yaw_step*YAW_STEP)
+    yaw_cmd =  math.floor(yaw_max - cur_yaw_step*YAW_STEP)
 
     if cur_pitch_step == false then -- Move to 23 degrees below horizon
         pitch_cmd =  math.ceil(pitch_trim - PITCH_STEP_DN)
@@ -107,11 +115,11 @@ function step_servo() -- Step Servo command through Sequence
         cur_pitch_step = false
     end
 
-    if yaw_cmd < yaw_max then
-        gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_cmd/deg2pwm - yaw_min/deg2pwm)))
+    if yaw_cmd > yaw_min then
+        gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_max/deg2pwm - yaw_cmd/deg2pwm)))
         SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_cmd)
         SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)      
-        return take_pic, 2000
+        return take_pic, 400
     else
         return reset_home, 1000
     end
@@ -119,7 +127,7 @@ end
 
 function reset_home() -- Resets Servos to Home position and step counts
     SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_trim)
-    SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_min)
+    SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_max)
     cur_yaw_step = -1
     cur_pitch_step = false
     takePic = false
