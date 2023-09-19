@@ -2,10 +2,12 @@
 -- Servos wait at each position for hotshoe feedback
 -- that shutter has taken picture
 
-local button_number = 1 -- the button number we want to read, as defined in AP_Button
+local start_button_number = 1 -- Start Button
+local stop_button_number = 2 -- Stop Button
+
 local trigger_button_state = false
-local button_new_state = button:get_button_state(button_number)
-local last_button_state = button_new_state
+local start_button_new_state = button:get_button_state(start_button_number)
+local stop_button_new_state = button:get_button_state(stop_button_number)
 
 local K_MOUNT_YAW = 6 -- Function Number for Yaw Mount
 local K_MOUNT_PITCH = 7 -- Function Number Pitch Mount
@@ -20,13 +22,13 @@ local cur_yaw_step = -1
 local cur_pitch_step = false
 
 local trig_hotshoe_state = false
-gpio:pinMode(54,0) -- set AUX 5 to input
-local camera_feedback = gpio:read(54)
+gpio:pinMode(55,0) -- set AUX 6 to input
+local camera_feedback = gpio:read(55)
 local takePic = false
 local picCount = 0 -- Current Counter of what picture we are on
 local picTotal = 3 -- Number of pictures per station
 
-local fileNum = -1
+local fileNum = 0
 local file_name = "Scan"..tostring(fileNum)..".csv"
 local file
 
@@ -42,6 +44,10 @@ local yaw_max = 2000
 local pitch_trim = 1625
 local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
+
+local pitch_pack = 1000
+local yaw_pack = 1500
+local packPosition = false
 
 function write_to_file()
     if not file then
@@ -72,21 +78,20 @@ function write_to_file()
 end
 
 function take_pic()
-    button_new_state = button:get_button_state(button_number) -- Switching Toggle exits scan
-    if button_new_state ~= trigger_button_state then
+    stop_button_new_state = button:get_button_state(stop_button_number) -- Switching Toggle exits scan
+    if stop_button_new_state == trigger_button_state then
         gcs:send_text(0, "Picture Aborted")
-        last_button_state = button_new_state
         takePic = false
         return reset_home, 100
     end
 
     if takePic == false then -- Trigger Servo Pin for Camera Trigger
         rc:run_aux_function(9, 2) -- Trigger Take Picture Auxillary Function
-        gcs:send_text(0, "Trigger " ..tostring(picCount+1).." Picture")
+        gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture")
         takePic = true
     end
-    camera_feedback = gpio:read(54)
-    if camera_feedback == trig_hotshoe_state then -- Hotshoe Feedback
+    camera_feedback = gpio:read(55)
+    if camera_feedback == trig_hotshoe_state and takePic == true then -- Hotshoe Feedback
         picCount = picCount + 1
         gcs:send_text(0, "Picture "..tostring(picCount).." Taken")
         takePic = false
@@ -97,11 +102,10 @@ function take_pic()
 end
 
 function step_servo() -- Step Servo command through Sequence
-    button_new_state = button:get_button_state(button_number)-- Switching Toggle exits scan
-    if button_new_state ~= trigger_button_state then
+    stop_button_new_state = button:get_button_state(stop_button_number)-- Switching Stop Button exits scan
+    if stop_button_new_state == trigger_button_state then
         gcs:send_text(0, "Scan Aborted")
         takePic = false
-        last_button_state = button_new_state
         return reset_home, 100
     end
     cur_yaw_step = cur_yaw_step + 1
@@ -118,7 +122,7 @@ function step_servo() -- Step Servo command through Sequence
     if yaw_cmd > yaw_min then
         gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_max/deg2pwm - yaw_cmd/deg2pwm)))
         SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_cmd)
-        SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)      
+        SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)
         return take_pic, 400
     else
         return reset_home, 1000
@@ -131,47 +135,50 @@ function reset_home() -- Resets Servos to Home position and step counts
     cur_yaw_step = -1
     cur_pitch_step = false
     takePic = false
-    if file then -- See if there is a file open
-        io.close(file) -- Close the currently open file
-        file = nil
-    end
+    packPosition = false
     gcs:send_text(0, "Resetting Servos to Home")
+    return check_button, 1000
+end
+
+function pack() -- Resets Servos to Packing Position
+    SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_pack)
+    SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_pack)
+    packPosition = true
+    gcs:send_text(0, "Packing Position")
     return check_button, 1000
 end
 
 function check_button() -- Check Toggle switch state
 
-  button_new_state = button:get_button_state(button_number)
+    start_button_new_state = button:get_button_state(start_button_number)
+    stop_button_new_state = button:get_button_state(stop_button_number)
 
-  -- the button has changes since the last loop
-  if button_new_state ~= last_button_state then
-    last_button_state = button_new_state
-    if button_new_state == trigger_button_state then
-        if file then -- See if there is a file open
-            io.close(file) -- Close the currently open file
-            file = nil
-        end
-
-        fileNum = fileNum + 1 -- Iterate Scan number for new file
-        file_name = "Scan"..tostring(fileNum)..".csv"
-        file = io.open(file_name, "a") -- Open and append new file
-        if not file then
-            error("Could not make file")
+    if start_button_new_state == trigger_button_state then
+        if packPosition == false then -- Not currently in packing position
+            return step_servo, 100
         else
-            gcs:send_text(0, "Starting "..file_name)
+            return reset_home, 100 -- We are in Packing position, send to home position
         end
-
-        -- write the CSV header
-        file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
-        file:flush()
-
-        return step_servo(), 100
-    else
-        return reset_home, 100
     end
-  end
 
-  return check_button, 1000 -- reschedules the loop (1hz)
+    if stop_button_new_state == trigger_button_state then
+        if packPosition == false then -- Not currently in packing position
+            return pack, 100
+        end
+    end
+
+    return check_button, 500 -- reschedules the loop (1hz)
 end
+
+file = io.open(file_name, "a") -- Open and append new file
+if not file then
+    error("Could not make file")
+else
+    gcs:send_text(0, "Starting "..file_name)
+end
+
+-- write the CSV header
+file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
+file:flush()
 
 return reset_home, 1000 -- Set Servos to home on boot
