@@ -123,7 +123,7 @@ function step_servo() -- Step Servo command through Sequence
         gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_max/deg2pwm - yaw_cmd/deg2pwm)))
         SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_cmd)
         SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)
-        return take_pic, 400
+        return take_pic, 500
     else
         return reset_home, 1000
     end
