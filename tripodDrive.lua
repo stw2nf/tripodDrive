@@ -1,6 +1,17 @@
 -- Toggle switch triggers servo movement sequence
 -- Servos wait at each position for hotshoe feedback
 -- that shutter has taken picture
+local secWeek = 604800 -- Number of seconds in a week
+local inititalDay = 4 -- Original Day GPS time began
+local initialYear = 1980 -- Original Year GPS time began
+local utcOffset = 18 -- Offset in seconds of UTC time
+local secDay = 86400 -- Extra Seconds in leap year
+local utc_sec_year = 31536000 -- Seconds in a year (No leap year)
+local utc_sec_leap_year = utc_sec_year + secDay
+
+local days_in_month_non_leap = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+local days_in_month_leap = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+local days_in_month
 
 local start_button_number = 1 -- Start Button
 local stop_button_number = 2 -- Stop Button
@@ -28,8 +39,7 @@ local takePic = false
 local picCount = 0 -- Current Counter of what picture we are on
 local picTotal = 3 -- Number of pictures per station
 
-local fileNum = 0
-local file_name = "Scan"..tostring(fileNum)..".csv"
+local file_name
 local file
 
 -- index for the data and table
@@ -48,6 +58,53 @@ local pitch_cmd = pitch_trim
 local pitch_pack = 1000
 local yaw_pack = 1500
 local packPosition = false
+
+function calc_DateTime(gps_week, gps_ms)
+    local tot_gps_sec = (gps_week*secWeek)+(gps_ms/1000)
+    local total_utc_sec = (tot_gps_sec+utcOffset) - utc_sec_year
+    local utc_year = 1 -- Years since 1980
+
+    while total_utc_sec >= utc_sec_year do
+        if (utc_year % 4 == 0 and (utc_year % 100 ~= 0 or utc_year % 400 == 0)) then
+            total_utc_sec = total_utc_sec - utc_sec_leap_year
+        else
+            total_utc_sec = total_utc_sec - utc_sec_year
+        end
+        utc_year = utc_year + 1
+    end
+
+    if (utc_year % 4 == 0 and (utc_year % 100 ~= 0 or utc_year % 400 == 0)) then
+        days_in_month = days_in_month_leap
+    else
+        days_in_month = days_in_month_non_leap
+    end
+    
+    local utc_days = (total_utc_sec/secDay)+inititalDay
+    local utc_sec = total_utc_sec - ((utc_days - inititalDay)*secDay)
+    local utc_hour = utc_sec/3600
+    local utc_min = (utc_sec - (utc_hour*3600))/60
+    --local utc_sec = utc_sec - utc_hour*3600 - utc_min*60
+    local month = 1
+    while utc_days >= days_in_month[month] do
+        utc_days = utc_days - days_in_month[month]
+        month = month + 1
+    end
+    utc_days = utc_days + 1
+    
+    file_name = tostring(month).."."..tostring(utc_days).."."..tostring(initialYear + utc_year).."_"..tostring(utc_hour).."_"..tostring(utc_min)..".csv"
+    file = io.open(file_name, "a") -- Open and append new file
+    if not file then
+        error("Could not make file")
+    else
+        gcs:send_text(0, "Starting "..file_name)
+    end
+    
+    -- write the CSV header
+    file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
+    file:flush()
+
+    return reset_home, 1000
+end
 
 function write_to_file()
     if not file then
@@ -170,15 +227,16 @@ function check_button() -- Check Toggle switch state
     return check_button, 500 -- reschedules the loop (1hz)
 end
 
-file = io.open(file_name, "a") -- Open and append new file
-if not file then
-    error("Could not make file")
-else
-    gcs:send_text(0, "Starting "..file_name)
+function wait_GPS()
+    local curr_loc = ahrs:get_location() -- Create location object at current location
+    if curr_loc == nil then
+        gcs:send_text(0, "Waiting for GPS Fix")
+        return wait_GPS, 1000
+    else
+        local week = gps:time_week(0)
+        local week_sec = gps:time_week_ms(0)
+        calc_DateTime(week, week_sec)
+    end
 end
 
--- write the CSV header
-file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
-file:flush()
-
-return reset_home, 1000 -- Set Servos to home on boot
+return wait_GPS, 1000 -- Wait for GPS fix to open timestamped log file
