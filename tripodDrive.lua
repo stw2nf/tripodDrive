@@ -33,8 +33,9 @@ local cur_yaw_step = -1
 local cur_pitch_step = false
 
 local trig_hotshoe_state = false
-gpio:pinMode(55,0) -- set AUX 6 to input
-local camera_feedback = gpio:read(55)
+local hotshoe_pin = 50 -- AUX 1 for input
+gpio:pinMode(hotshoe_pin,0) -- set AUX 1 to input
+local camera_feedback = gpio:read(hotshoe_pin)
 local takePic = false
 local picCount = 0 -- Current Counter of what picture we are on
 local picTotal = 3 -- Number of pictures per station
@@ -147,7 +148,7 @@ function take_pic()
         gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture")
         takePic = true
     end
-    camera_feedback = gpio:read(55)
+    camera_feedback = gpio:read(hotshoe_pin)
     if camera_feedback == trig_hotshoe_state and takePic == true then -- Hotshoe Feedback
         picCount = picCount + 1
         gcs:send_text(0, "Picture "..tostring(picCount).." Taken")
