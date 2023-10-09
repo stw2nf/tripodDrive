@@ -57,6 +57,7 @@ local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
 
 local pitch_pack = 1000
+local pitch_home = 2000
 local yaw_pack = 1500
 local packPosition = false
 
@@ -188,7 +189,7 @@ function step_servo() -- Step Servo command through Sequence
 end
 
 function reset_home() -- Resets Servos to Home position and step counts
-    SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_trim)
+    SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_home)
     SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_max)
     cur_yaw_step = -1
     cur_pitch_step = false
