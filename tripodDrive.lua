@@ -104,7 +104,6 @@ function calc_DateTime(gps_week, gps_ms)
     -- write the CSV header
     file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
     file:flush()
-
     return reset_home, 1000
 end
 
@@ -189,26 +188,26 @@ function step_servo() -- Step Servo command through Sequence
 end
 
 function reset_home() -- Resets Servos to Home position and step counts
+    gcs:send_text(0, "Resetting Servos to Home")
     SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_home)
     SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_max)
     cur_yaw_step = -1
     cur_pitch_step = false
     takePic = false
     packPosition = false
-    gcs:send_text(0, "Resetting Servos to Home")
     return check_button, 1000
 end
 
 function pack() -- Resets Servos to Packing Position
+    gcs:send_text(0, "Packing Position")
     SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_pack)
     SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_pack)
     packPosition = true
-    gcs:send_text(0, "Packing Position")
     return check_button, 1000
 end
 
 function check_button() -- Check Toggle switch state
-
+    -- gcs:send_text(0, "Press a button to trigger")
     start_button_new_state = button:get_button_state(start_button_number)
     stop_button_new_state = button:get_button_state(stop_button_number)
 
@@ -237,7 +236,7 @@ function wait_GPS()
     else
         local week = gps:time_week(0)
         local week_sec = gps:time_week_ms(0)
-        calc_DateTime(week, week_sec)
+        return calc_DateTime(week, week_sec)
     end
 end
 
