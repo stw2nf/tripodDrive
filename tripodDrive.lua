@@ -61,6 +61,9 @@ local pitch_home = 2000
 local yaw_pack = 1500
 local packPosition = false
 
+local movementDelay = 500 -- Amount of time (ms) to wait before triggering first picture, to allow servos to move to location
+local nextPicDelay = 10 -- Amount of time (ms) to wait between pictures at a single station
+
 function calc_DateTime(gps_week, gps_ms)
     local tot_gps_sec = (gps_week*secWeek)+(gps_ms/1000)
     local total_utc_sec = (tot_gps_sec+utcOffset) - utc_sec_year
@@ -131,7 +134,7 @@ function write_to_file()
         picCount = 0
         return step_servo, 500
     else
-        return take_pic, 1
+        return take_pic, nextPicDelay
     end
 end
 
@@ -181,7 +184,7 @@ function step_servo() -- Step Servo command through Sequence
         gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_max/deg2pwm - yaw_cmd/deg2pwm)))
         SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_cmd)
         SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)
-        return take_pic, 500
+        return take_pic, movementDelay
     else
         return reset_home, 1000
     end
