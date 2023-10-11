@@ -228,7 +228,7 @@ function check_button() -- Check Toggle switch state
         end
     end
 
-    return check_button, 500 -- reschedules the loop (1hz)
+    return check_button, 50 -- reschedules the loop (1hz)
 end
 
 function wait_GPS()
