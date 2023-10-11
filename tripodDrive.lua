@@ -52,12 +52,12 @@ local log_data = {}
 
 local yaw_min = 1000
 local yaw_max = 2000
-local pitch_trim = 1500
-local yaw_cmd = yaw_max
+local pitch_trim = 1250
+local yaw_cmd = yaw_min
 local pitch_cmd = pitch_trim
 
-local pitch_pack = 1000
-local pitch_home = 2000
+local pitch_pack = 1500
+local pitch_home = 1000
 local yaw_pack = 1500
 local packPosition = false
 
