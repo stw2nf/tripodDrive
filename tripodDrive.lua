@@ -53,11 +53,11 @@ local log_data = {}
 local yaw_min = 1000
 local yaw_max = 2000
 local pitch_trim = 1206
-local yaw_cmd = yaw_min
+local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
 
-local pitch_pack = 1500
-local pitch_home = 1000
+local pitch_pack = 1500 -- Zenith (Straight Up)
+local pitch_home = 1000 -- Nadir (Straight Down)
 local yaw_pack = 1500
 local packPosition = false
 
@@ -170,7 +170,7 @@ function step_servo() -- Step Servo command through Sequence
         return reset_home, 100
     end
     cur_yaw_step = cur_yaw_step + 1
-    yaw_cmd =  math.floor(yaw_min + cur_yaw_step*YAW_STEP)
+    yaw_cmd =  math.floor(yaw_max - cur_yaw_step*YAW_STEP)
 
     if cur_pitch_step == false then -- Move to 23 degrees below horizon
         pitch_cmd =  math.ceil(pitch_trim - PITCH_STEP_DN)
@@ -180,7 +180,7 @@ function step_servo() -- Step Servo command through Sequence
         cur_pitch_step = false
     end
 
-    if yaw_cmd < yaw_max then
+    if yaw_cmd > yaw_min then
         gcs:send_text(0, "Pitch Angle: "..tostring(math.floor(pitch_cmd/deg2pwm - pitch_trim/deg2pwm)).." Yaw Angle: "..tostring(math.ceil(yaw_max/deg2pwm - yaw_cmd/deg2pwm)))
         SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_cmd)
         SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)
@@ -193,7 +193,7 @@ end
 function reset_home() -- Resets Servos to Home position and step counts
     gcs:send_text(0, "Resetting Servos to Home")
     SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_home)
-    SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_min)
+    SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_max)
     cur_yaw_step = -1
     cur_pitch_step = false
     takePic = false
