@@ -26,7 +26,7 @@ local K_MOUNT_PITCH = 7 -- Function Number Pitch Mount
 local deg2pwm = 2.778 -- Convert degrees to PWM
 
 local YAW_STEP = 36*deg2pwm -- Yaw step in PWM
-local PITCH_STEP_UP = 37*deg2pwm -- Pitch step in PWM
+local PITCH_STEP_UP = 38*deg2pwm -- Pitch step in PWM
 local PITCH_STEP_DN = 24*deg2pwm -- Pitch step in PWM
 
 local cur_yaw_step = -1
