@@ -1,6 +1,22 @@
 -- Toggle switch triggers servo movement sequence
 -- Servos wait at each position for hotshoe feedback
 -- that shutter has taken picture
+local PARAM_TABLE_KEY = 73
+
+assert(param:add_table(PARAM_TABLE_KEY, "TP_", 6), 'could not add param table')
+
+-- create two parameters. The param indexes (2nd argument) must
+-- be between 1 and 63. All added parameters are floats, with the given
+-- default value (4th argument).
+assert(param:add_param(PARAM_TABLE_KEY, 1, 'YAW_STEP', 36), 'could not add TP_YAW_STEP')
+assert(param:add_param(PARAM_TABLE_KEY, 2, 'PTCH_UP', 40), 'could not add TP_PTCH_UP')
+assert(param:add_param(PARAM_TABLE_KEY, 3, 'PTCH_DN', 24), 'could not add TP_PTCH_DN')
+assert(param:add_param(PARAM_TABLE_KEY, 4, 'PTCH_TRM',74), 'could not add TP_PTCH_TRM')
+assert(param:add_param(PARAM_TABLE_KEY, 5, 'MV_DLY', 500), 'could not add TP_MV_DLY')
+assert(param:add_param(PARAM_TABLE_KEY, 6, 'PIC_DLY', 10), 'could not add TP_PIC_DLY')
+
+-- gcs:send_text(0, string.format("Added 6 parameters"))
+
 local secWeek = 604800 -- Number of seconds in a week
 local inititalDay = 4 -- Original Day GPS time began
 local initialYear = 1980 -- Original Year GPS time began
@@ -25,9 +41,9 @@ local K_MOUNT_PITCH = 7 -- Function Number Pitch Mount
 
 local deg2pwm = 2.778 -- Convert degrees to PWM
 
-local YAW_STEP = 36*deg2pwm -- Yaw step in PWM
-local PITCH_STEP_UP = 40*deg2pwm -- Pitch step in PWM
-local PITCH_STEP_DN = 24*deg2pwm -- Pitch step in PWM
+local YAW_STEP = param:get("TP_YAW_STEP")*deg2pwm -- Yaw step in PWM
+local PITCH_STEP_UP = param:get("TP_PTCH_UP")*deg2pwm -- Pitch step in PWM
+local PITCH_STEP_DN = param:get("TP_PTCH_DN")*deg2pwm -- Pitch step in PWM
 
 local cur_yaw_step = -1
 local cur_pitch_step = false
@@ -52,7 +68,7 @@ local log_data = {}
 
 local yaw_min = 1000
 local yaw_max = 2000
-local pitch_trim = 1206
+local pitch_trim = 1000 + (param:get("TP_PTCH_TRM")/deg2pwm)
 local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
 
@@ -61,10 +77,27 @@ local pitch_home = 1000 -- Nadir (Straight Down)
 local yaw_pack = 1500
 local packPosition = false
 
-local movementDelay = 500 -- Amount of time (ms) to wait before triggering first picture of each station, to allow servos to move to location
-local nextPicDelay = 10 -- Amount of time (ms) to wait between pictures at a single station
+local movementDelay = param:get("TP_MV_DLY") -- Amount of time (ms) to wait before triggering first picture of each station, to allow servos to move to location
+local nextPicDelay = param:get("TP_PIC_DLY") -- Amount of time (ms) to wait between pictures at a single station
+
+local gpsTimeout = 15000 -- Time to wait for GPS fix
+local startTime = millis()
 
 function calc_DateTime(gps_week, gps_ms)
+    if gps_week == 0 and gps_ms == 0 then
+        file_name = "Scan"..tostring(math.random(1000))..".csv"
+        file = io.open(file_name, "a") -- Open and append new file
+        if not file then
+            error("Could not make file")
+        else
+            gcs:send_text(0, "Starting "..file_name)
+        end
+        
+        -- write the CSV header
+        file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
+        file:flush()
+        return reset_home, 1000     
+    end 
     local tot_gps_sec = (gps_week*secWeek)+(gps_ms/1000)
     local total_utc_sec = (tot_gps_sec+utcOffset) - utc_sec_year
     local utc_year = 1 -- Years since 1980
@@ -211,6 +244,7 @@ end
 
 function check_button() -- Check Toggle switch state
     -- gcs:send_text(0, "Press a button to trigger")
+    updateParams()
     start_button_new_state = button:get_button_state(start_button_number)
     stop_button_new_state = button:get_button_state(stop_button_number)
 
@@ -233,14 +267,30 @@ end
 
 function wait_GPS()
     local curr_loc = ahrs:get_location() -- Create location object at current location
-    if curr_loc == nil then
+    if curr_loc == nil and millis() - startTime < gpsTimeout then
         gcs:send_text(0, "Waiting for GPS Fix")
         return wait_GPS, 1000
     else
-        local week = gps:time_week(0)
-        local week_sec = gps:time_week_ms(0)
+        local week
+        local week_sec
+        if curr_loc ~= nil then
+            week = gps:time_week(0)
+            week_sec = gps:time_week_ms(0)
+        else 
+            week = 0
+            week_sec = 0
+        end
         return calc_DateTime(week, week_sec)
     end
+end
+
+function updateParams()
+    YAW_STEP = param:get("TP_YAW_STEP")*deg2pwm
+    PITCH_STEP_UP = param:get("TP_PTCH_UP")*deg2pwm
+    PITCH_STEP_DN = param:get("TP_PTCH_DN")*deg2pwm
+    pitch_trim = 1000 + (param:get("TP_PTCH_TRM")/deg2pwm)
+    movementDelay = param:get("TP_MV_DLY")
+    nextPicDelay = param:get("TP_PIC_DLY")
 end
 
 return wait_GPS, 1000 -- Wait for GPS fix to open timestamped log file
