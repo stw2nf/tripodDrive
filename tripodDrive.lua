@@ -68,7 +68,7 @@ local log_data = {}
 
 local yaw_min = 1000
 local yaw_max = 2000
-local pitch_trim = 1000 + (param:get("TP_PTCH_TRM")/deg2pwm)
+local pitch_trim = 1000 + (param:get("TP_PTCH_TRM")*deg2pwm)
 local yaw_cmd = yaw_max
 local pitch_cmd = pitch_trim
 
