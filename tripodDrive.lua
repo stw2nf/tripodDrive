@@ -165,7 +165,7 @@ function write_to_file()
     file:flush()
     if picCount >= picTotal then
         picCount = 0
-        return step_servo, 750
+        return step_servo, 500
     else
         return take_pic, nextPicDelay
     end
@@ -189,6 +189,7 @@ function take_pic()
         picCount = picCount + 1
         gcs:send_text(0, "Picture "..tostring(picCount).." Taken")
         takePic = false
+        camera_feedback = true
         return write_to_file, 100
     else
         return take_pic, 1
