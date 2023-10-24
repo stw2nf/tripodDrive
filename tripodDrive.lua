@@ -165,9 +165,9 @@ function write_to_file()
     file:flush()
     if picCount >= picTotal then
         picCount = 0
-        return step_servo, 1000
+        return step_servo, nextPicDelay
     else
-        return take_pic, nextPicDelay
+        return take_pic, 1
     end
 end
 
