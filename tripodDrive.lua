@@ -90,6 +90,8 @@ local week_sec
 
 function calc_DateTime(gps_week, gps_ms)
     if gps_week == 0 and gps_ms == 0 then
+        local seedValue = tostring(millis())
+        math.randomseed(tonumber(seedValue))
         file_name = "Scan"..tostring(math.random(1000))..".mrk"
         file = io.open(file_name, "a") -- Open and append new file
         if not file then
@@ -160,9 +162,9 @@ function write_to_file()
         week = 0
         week_sec = 0
     end
-    log_data[gps_sec_log] = week_sec
-    log_data[gps_week_log] = week
-    
+    log_data[gps_sec_log] = tostring(week_sec)
+    log_data[gps_week_log] = tostring(week)
+
     if curr_loc == nil then
         log_data[lat] = -1
         log_data[long] = -1 
@@ -175,7 +177,7 @@ function write_to_file()
 
     -- write data
     -- separate with comas and add a carriage return
-    file:write(tostring(millis()) .. ", " .. table.concat(log_data,", ") .. "\n")
+    file:write(table.concat(log_data,", ") .. "\n")
     -- make sure file is upto date
     file:flush()
     if picCount >= picTotal then
