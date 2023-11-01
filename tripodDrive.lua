@@ -60,10 +60,12 @@ local file_name
 local file
 
 -- index for the data and table
-local lat = 1
-local long = 2
-local pitch = 3
-local yaw = 4
+local gps_sec_log = 1
+local gps_week_log = 2
+local lat = 3
+local long = 4
+local pitch = 5
+local yaw = 6
 local log_data = {}
 
 local yaw_min = 1000
@@ -83,9 +85,12 @@ local nextPicDelay = param:get("TP_PIC_DLY") -- Amount of time (ms) to wait betw
 local gpsTimeout = 15000 -- Time to wait for GPS fix
 local startTime = millis()
 
+local week
+local week_sec
+
 function calc_DateTime(gps_week, gps_ms)
     if gps_week == 0 and gps_ms == 0 then
-        file_name = "Scan"..tostring(math.random(1000))..".csv"
+        file_name = "Scan"..tostring(math.random(1000))..".mrk"
         file = io.open(file_name, "a") -- Open and append new file
         if not file then
             error("Could not make file")
@@ -94,7 +99,7 @@ function calc_DateTime(gps_week, gps_ms)
         end
         
         -- write the CSV header
-        file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
+        file:write('GPS Seconds, GPS Week, Lat, Long, Pitch (PWM), Yaw (PWM)\n')
         file:flush()
         return reset_home, 1000     
     end 
@@ -129,7 +134,7 @@ function calc_DateTime(gps_week, gps_ms)
     end
     utc_days = utc_days + 1
     
-    file_name = tostring(month).."."..tostring(utc_days).."."..tostring(initialYear + utc_year).."_"..tostring(utc_hour).."_"..tostring(utc_min)..".csv"
+    file_name = tostring(month).."."..tostring(utc_days).."."..tostring(initialYear + utc_year).."_"..tostring(utc_hour).."_"..tostring(utc_min)..".mrk"
     file = io.open(file_name, "a") -- Open and append new file
     if not file then
         error("Could not make file")
@@ -138,7 +143,7 @@ function calc_DateTime(gps_week, gps_ms)
     end
     
     -- write the CSV header
-    file:write('Time Stamp(ms), Lat, Long, Pitch (PWM), Yaw (PWM)\n')
+    file:write('GPS Seconds, GPS Week, Lat, Long, Pitch (PWM), Yaw (PWM)\n')
     file:flush()
     return reset_home, 1000
 end
@@ -148,6 +153,16 @@ function write_to_file()
       error("Could not open file")
     end
     local curr_loc = ahrs:get_location() -- Create location object at current location
+    if curr_loc ~= nil then
+        week = gps:time_week(0)
+        week_sec = gps:time_week_ms(0)
+    else 
+        week = 0
+        week_sec = 0
+    end
+    log_data[gps_sec_log] = week_sec
+    log_data[gps_week_log] = week
+    
     if curr_loc == nil then
         log_data[lat] = -1
         log_data[long] = -1 
@@ -272,8 +287,6 @@ function wait_GPS()
         gcs:send_text(0, "Waiting for GPS Fix")
         return wait_GPS, 1000
     else
-        local week
-        local week_sec
         if curr_loc ~= nil then
             week = gps:time_week(0)
             week_sec = gps:time_week_ms(0)
