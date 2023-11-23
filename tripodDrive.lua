@@ -268,6 +268,8 @@ function check_button() -- Check Toggle switch state
 
     if start_button_new_state == trigger_button_state then
         if packPosition == false then -- Not currently in packing position
+            file:write("Start Scan\n")
+            file:flush()
             return step_servo, 100
         else
             return reset_home, 100 -- We are in Packing position, send to home position
