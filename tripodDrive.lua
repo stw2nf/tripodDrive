@@ -88,6 +88,14 @@ local startTime = millis()
 local week
 local week_sec
 
+function checkAbort()
+    stop_button_new_state = button:get_button_state(stop_button_number) -- Switching Toggle exits scan
+    if stop_button_new_state == trigger_button_state then
+        gcs:send_text(0, "Picture Aborted")
+        return reset_home, 100
+    end
+end
+
 function calc_DateTime(gps_week, gps_ms)
     if gps_week == 0 and gps_ms == 0 then
         local seedValue = tostring(millis())
@@ -189,13 +197,7 @@ function write_to_file()
 end
 
 function take_pic()
-    stop_button_new_state = button:get_button_state(stop_button_number) -- Switching Toggle exits scan
-    if stop_button_new_state == trigger_button_state then
-        gcs:send_text(0, "Picture Aborted")
-        takePic = false
-        return reset_home, 100
-    end
-
+    checkAbort()
     if takePic == false then -- Trigger Servo Pin for Camera Trigger
         rc:run_aux_function(9, 2) -- Trigger Take Picture Auxillary Function
         gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture")
@@ -214,12 +216,7 @@ function take_pic()
 end
 
 function step_servo() -- Step Servo command through Sequence
-    stop_button_new_state = button:get_button_state(stop_button_number)-- Switching Stop Button exits scan
-    if stop_button_new_state == trigger_button_state then
-        gcs:send_text(0, "Scan Aborted")
-        takePic = false
-        return reset_home, 100
-    end
+    checkAbort()
     cur_yaw_step = cur_yaw_step + 1
     yaw_cmd =  math.floor(yaw_max - cur_yaw_step*YAW_STEP)
 
@@ -246,6 +243,7 @@ function reset_home() -- Resets Servos to Home position and step counts
     SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_home)
     SRV_Channels:set_output_pwm(K_MOUNT_YAW, yaw_max)
     cur_yaw_step = -1
+    picCount = 0
     cur_pitch_step = false
     takePic = false
     packPosition = false
