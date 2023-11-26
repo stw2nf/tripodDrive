@@ -88,6 +88,9 @@ local startTime = millis()
 local week
 local week_sec
 
+local picCmdTime
+local picTimeout = 10000 -- 10 second picture timeout, past this send another takePic Command we must have missed it
+
 function checkAbort()
     stop_button_new_state = button:get_button_state(stop_button_number) -- Switching Toggle exits scan
     if stop_button_new_state == trigger_button_state then
@@ -202,7 +205,15 @@ function take_pic()
         rc:run_aux_function(9, 2) -- Trigger Take Picture Auxillary Function
         gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture")
         takePic = true
+        picCmdTime = millis()
     end
+
+    -- Resend the picture command if we haven't gotten a picture after picTimeout
+    if millis() - picCmdTime > picTimeout then
+        takePic = false
+        gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture Again")
+    end
+
     camera_feedback = gpio:read(hotshoe_pin)
     if camera_feedback == trig_hotshoe_state and takePic == true then -- Hotshoe Feedback
         picCount = picCount + 1
