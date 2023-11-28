@@ -3,7 +3,7 @@
 -- that shutter has taken picture
 local PARAM_TABLE_KEY = 73
 
-assert(param:add_table(PARAM_TABLE_KEY, "TP_", 6), 'could not add param table')
+assert(param:add_table(PARAM_TABLE_KEY, "TP_", 7), 'could not add param table')
 
 -- create two parameters. The param indexes (2nd argument) must
 -- be between 1 and 63. All added parameters are floats, with the given
@@ -14,6 +14,7 @@ assert(param:add_param(PARAM_TABLE_KEY, 3, 'PTCH_DN', 24), 'could not add TP_PTC
 assert(param:add_param(PARAM_TABLE_KEY, 4, 'PTCH_TRM',74), 'could not add TP_PTCH_TRM')
 assert(param:add_param(PARAM_TABLE_KEY, 5, 'MV_DLY', 500), 'could not add TP_MV_DLY')
 assert(param:add_param(PARAM_TABLE_KEY, 6, 'PIC_DLY', 10), 'could not add TP_PIC_DLY')
+assert(param:add_param(PARAM_TABLE_KEY, 7, 'TIMEOUT', 4000), 'could not add TP_TIMEOUT')
 
 -- gcs:send_text(0, string.format("Added 6 parameters"))
 
@@ -59,7 +60,7 @@ local movementDelay = param:get("TP_MV_DLY") -- Amount of time (ms) to wait befo
 local nextPicDelay = param:get("TP_PIC_DLY") -- Amount of time (ms) to wait between pictures at a single station
 
 local picCmdTime
-local picTimeout = 20000 -- 20 second picture timeout, past this send another takePic Command we must have missed it
+local picTimeout = param:get("TP_TIMEOUT") -- Amount of time (ms) to wait between pictures at a single station 
 
 local abortPicture = false
 
@@ -184,6 +185,7 @@ function updateParams()
     pitch_trim = 1000 + (param:get("TP_PTCH_TRM")/deg2pwm)
     movementDelay = param:get("TP_MV_DLY")
     nextPicDelay = param:get("TP_PIC_DLY")
+    picTimeout = param:get("TP_TIMEOUT")
 end
 
 return reset_home, 1000 -- Reset to home to start
