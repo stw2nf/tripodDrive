@@ -208,14 +208,12 @@ function take_pic()
         takePic = true
         picCmdTime = millis()
     end
-
-    -- Resend the picture command if we haven't gotten a picture after picTimeout
-    if millis() - picCmdTime > picTimeout then
-        takePic = false
-        gcs:send_text(0, "Trigger "..tostring(picCount+1).." Picture Again")
-    end
-
     camera_feedback = gpio:read(hotshoe_pin)
+    -- Patch for Comet with hotshoe issue, just move on after timeout
+    if millis() - picCmdTime > picTimeout then
+        camera_feedback = trig_hotshoe_state
+        gcs:send_text(0, "Move on after Timeout")
+    end
     if camera_feedback == trig_hotshoe_state and takePic == true then -- Hotshoe Feedback
         picCount = picCount + 1
         gcs:send_text(0, "Picture "..tostring(picCount).." Taken")
