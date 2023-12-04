@@ -3,7 +3,7 @@
 -- that shutter has taken picture
 local PARAM_TABLE_KEY = 73
 
-assert(param:add_table(PARAM_TABLE_KEY, "TP_", 7), 'could not add param table')
+assert(param:add_table(PARAM_TABLE_KEY, "TP_", 8), 'could not add param table')
 
 -- create two parameters. The param indexes (2nd argument) must
 -- be between 1 and 63. All added parameters are floats, with the given
@@ -15,7 +15,7 @@ assert(param:add_param(PARAM_TABLE_KEY, 4, 'PTCH_TRM',74), 'could not add TP_PTC
 assert(param:add_param(PARAM_TABLE_KEY, 5, 'MV_DLY', 500), 'could not add TP_MV_DLY')
 assert(param:add_param(PARAM_TABLE_KEY, 6, 'PIC_DLY', 10), 'could not add TP_PIC_DLY')
 assert(param:add_param(PARAM_TABLE_KEY, 7, 'TIMEOUT', 4000), 'could not add TP_TIMEOUT')
-
+assert(param:add_param(PARAM_TABLE_KEY, 8, 'ARM_WAIT', 15000), 'could not add TP_ARM_WAIT')
 -- gcs:send_text(0, string.format("Added 6 parameters"))
 
 local start_button_number = 1 -- Start Button
@@ -63,6 +63,17 @@ local picCmdTime
 local picTimeout = param:get("TP_TIMEOUT") -- Amount of time (ms) to wait between pictures at a single station 
 
 local abortPicture = false
+local waitArm = param:get("TP_ARM_WAIT") -- Amount of time (ms) to wait after arming to allow geotagging session to begin
+
+function armVehicle()
+    arming:arm()
+    return step_servo, waitArm
+end
+
+function disarmVehicle()
+    arming:disarm()
+    return check_button, 1
+end
 
 function checkAbort()
     stop_button_new_state = button:get_button_state(stop_button_number) -- Switching Toggle exits scan
@@ -111,7 +122,7 @@ end
 function step_servo() -- Step Servo command through Sequence
     checkAbort()
     if abortPicture == true then
-        return reset_home, 1
+        return reset_home, 1000
     end
     cur_yaw_step = cur_yaw_step + 1
     yaw_cmd =  math.floor(yaw_max - cur_yaw_step*YAW_STEP)
@@ -130,7 +141,7 @@ function step_servo() -- Step Servo command through Sequence
         SRV_Channels:set_output_pwm(K_MOUNT_PITCH, pitch_cmd)
         return take_pic, movementDelay
     else
-        return reset_home, 1000
+        return reset_home, 1
     end
 end
 
@@ -144,7 +155,7 @@ function reset_home() -- Resets Servos to Home position and resets step counts
     cur_pitch_step = false
     takePic = false
     packPosition = false
-    return check_button, 1000
+    return disarmVehicle, 1000
 end
 
 function pack() -- Resets Servos to Packing Position
@@ -163,7 +174,7 @@ function check_button() -- Check Toggle switch state
 
     if start_button_new_state == trigger_button_state then
         if packPosition == false then -- Not currently in packing position
-            return step_servo, 100
+            return armVehicle, 1
         else
             return reset_home, 100 -- We are in Packing position, send to home position
         end
@@ -186,6 +197,7 @@ function updateParams()
     movementDelay = param:get("TP_MV_DLY")
     nextPicDelay = param:get("TP_PIC_DLY")
     picTimeout = param:get("TP_TIMEOUT")
+    waitArm = param:get("TP_ARM_WAIT")
 end
 
 return reset_home, 1000 -- Reset to home to start
